@@ -109,7 +109,7 @@ export default function MapView() {
   }, [filter, userPos]);
 
   return (
-    <div className="relative h-screen w-full overflow-hidden pb-20">
+    <div className="relative w-full" style={{ height: '100vh' }}>
       {/* Filters */}
       <div className="absolute top-3 left-0 right-0 z-[1000] flex justify-center gap-2 px-4">
         {FILTER_OPTIONS.map((f) => (
@@ -128,7 +128,7 @@ export default function MapView() {
       </div>
 
       {/* Map container */}
-      <div ref={mapContainerRef} className="h-full w-full" style={{ background: '#0d0d0d' }} />
+      <div ref={mapContainerRef} style={{ height: '100%', width: '100%', background: '#0d0d0d' }} />
 
       {/* Selected popup */}
       {selected && (
