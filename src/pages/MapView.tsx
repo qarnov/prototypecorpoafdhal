@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { DUMMY_POSTS, CATEGORY_CONFIG } from '@/lib/constants';
@@ -16,7 +15,6 @@ const FILTER_OPTIONS: { label: string; value: Category | 'all' }[] = [
 
 const DEFAULT_CENTER: [number, number] = [12.9716, 77.5946];
 
-// Seeded offsets per post index so pins are stable
 const OFFSETS: [number, number][] = [
   [0.008, -0.012],
   [-0.015, 0.006],
@@ -30,34 +28,85 @@ function makeIcon(category: Category) {
   const emoji = CATEGORY_CONFIG[category].emoji;
   return L.divIcon({
     className: '',
-    html: `<div style="font-size:24px;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:hsl(0 0% 10% / 0.85);box-shadow:0 2px 8px rgba(0,0,0,0.5);">${emoji}</div>`,
+    html: `<div style="font-size:22px;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:rgba(20,20,20,0.85);box-shadow:0 2px 8px rgba(0,0,0,0.5);">${emoji}</div>`,
     iconSize: [36, 36],
     iconAnchor: [18, 18],
   });
 }
 
-function FlyToUser({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.flyTo(center, 14, { duration: 1.5 });
-  }, [center, map]);
-  return null;
-}
+const userIcon = L.divIcon({
+  className: '',
+  html: `<div style="width:16px;height:16px;border-radius:50%;background:hsl(272,60%,47%);box-shadow:0 0 12px 4px hsla(272,60%,47%,0.5);border:2px solid white;"></div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+});
 
 export default function MapView() {
   const [filter, setFilter] = useState<Category | 'all'>('all');
   const [selected, setSelected] = useState<Post | null>(null);
   const [userPos, setUserPos] = useState<[number, number]>(DEFAULT_CENTER);
+  const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const markersRef = useRef<L.Marker[]>([]);
+  const userMarkerRef = useRef<L.Marker | null>(null);
 
+  // Init map
   useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = L.map(mapContainerRef.current, {
+      center: DEFAULT_CENTER,
+      zoom: 14,
+      zoomControl: false,
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    }).addTo(map);
+
+    mapRef.current = map;
+
+    // Get user location
     navigator.geolocation.getCurrentPosition(
-      (pos) => setUserPos([pos.coords.latitude, pos.coords.longitude]),
+      (pos) => {
+        const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setUserPos(coords);
+        map.flyTo(coords, 14, { duration: 1.5 });
+      },
       () => {/* keep default */},
       { enableHighAccuracy: true, timeout: 8000 }
     );
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
   }, []);
 
-  const filtered = filter === 'all' ? DUMMY_POSTS : DUMMY_POSTS.filter(p => p.category === filter);
+  // Update markers when filter or userPos changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Clear old markers
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+    userMarkerRef.current?.remove();
+
+    // User marker
+    userMarkerRef.current = L.marker(userPos, { icon: userIcon }).addTo(map);
+
+    // Post markers
+    const filtered = filter === 'all' ? DUMMY_POSTS : DUMMY_POSTS.filter(p => p.category === filter);
+    filtered.forEach((post, i) => {
+      const offset = OFFSETS[i % OFFSETS.length];
+      const pos: [number, number] = [userPos[0] + offset[0], userPos[1] + offset[1]];
+      const marker = L.marker(pos, { icon: makeIcon(post.category) })
+        .addTo(map)
+        .on('click', () => setSelected(post));
+      markersRef.current.push(marker);
+    });
+  }, [filter, userPos]);
 
   return (
     <div className="relative h-screen w-full overflow-hidden pb-20">
@@ -78,48 +127,8 @@ export default function MapView() {
         ))}
       </div>
 
-      {/* Map */}
-      <MapContainer
-        center={userPos}
-        zoom={14}
-        zoomControl={false}
-        className="h-full w-full"
-        style={{ background: '#0d0d0d' }}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        />
-        <FlyToUser center={userPos} />
-
-        {/* Post markers */}
-        {filtered.map((post, i) => {
-          const offset = OFFSETS[i % OFFSETS.length];
-          const position: [number, number] = [
-            userPos[0] + offset[0],
-            userPos[1] + offset[1],
-          ];
-          return (
-            <Marker
-              key={post.id}
-              position={position}
-              icon={makeIcon(post.category)}
-              eventHandlers={{ click: () => setSelected(post) }}
-            />
-          );
-        })}
-
-        {/* User location marker */}
-        <Marker
-          position={userPos}
-          icon={L.divIcon({
-            className: '',
-            html: `<div style="width:16px;height:16px;border-radius:50%;background:hsl(272 60% 47%);box-shadow:0 0 12px 4px hsl(272 60% 47% / 0.5);border:2px solid white;"></div>`,
-            iconSize: [16, 16],
-            iconAnchor: [8, 8],
-          })}
-        />
-      </MapContainer>
+      {/* Map container */}
+      <div ref={mapContainerRef} className="h-full w-full" style={{ background: '#0d0d0d' }} />
 
       {/* Selected popup */}
       {selected && (
