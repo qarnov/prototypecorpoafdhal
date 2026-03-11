@@ -7,7 +7,9 @@ interface AuthContextType {
   session: Session | null;
   profile: any | null;
   loading: boolean;
+  needsUsername: boolean;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
