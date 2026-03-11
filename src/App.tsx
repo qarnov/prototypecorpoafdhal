@@ -11,6 +11,7 @@ import MapView from "./pages/MapView";
 import ChatList from "./pages/ChatList";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
+import UsernameModal from "./components/UsernameModal";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
