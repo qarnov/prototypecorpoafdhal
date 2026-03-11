@@ -128,7 +128,7 @@ export default function MapView() {
       </div>
 
       {/* Map container */}
-      <div ref={mapContainerRef} className="h-full w-full" style={{ background: '#0d0d0d' }} />
+      <div ref={mapContainerRef} style={{ height: '100%', width: '100%', background: '#0d0d0d' }} />
 
       {/* Selected popup */}
       {selected && (
