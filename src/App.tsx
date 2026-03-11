@@ -31,6 +31,9 @@ function AppRoutes() {
 
   return (
     <div className="mx-auto max-w-md min-h-screen">
+      {needsUsername && user && (
+        <UsernameModal userId={user.id} onComplete={refreshProfile} />
+      )}
       <Routes>
         <Route path="/" element={<Feed />} />
         <Route path="/post" element={<PostRequest />} />
